@@ -1,0 +1,560 @@
+module org-openroadm-service {
+    namespace "http://org/openroadm/service";
+    prefix org-openroadm-service;
+
+    import org-openroadm-common-types {
+        prefix org-openroadm-common-types;
+    }
+
+    organization
+        "Open ROADM MSA";
+    contact
+        "OpenROADM.org";
+    description
+        "YANG definitions for OpenROADM service model.
+         This module defines optical service provisioning including
+         service creation, modification, deletion, and path computation.
+
+         An optical service represents an end-to-end connection across
+         the optical network, from a source client port to a destination
+         client port, traversing one or more ROADM nodes.
+
+         Service lifecycle:
+         1. Service creation request (service-create RPC)
+         2. Path computation (find route through network)
+         3. Resource allocation (assign wavelength, configure devices)
+         4. Service activation (bring service in-service)
+         5. Service monitoring (performance, alarms)
+         6. Service modification or deletion
+
+         Copyright of the Members of the Open ROADM Multi-Source Agreement 2024.";
+
+    revision 2024-01-01 {
+        description
+            "Version 18.1.0";
+    }
+
+    grouping service-endpoint {
+        description
+            "Grouping defining a service endpoint (source or destination).
+             Specifies the node, port, and signal parameters for one
+             end of an optical service.";
+
+        leaf node-id {
+            type string;
+            mandatory true;
+            description
+                "Network element node identifier for this endpoint.";
+        }
+
+        leaf clli {
+            type string;
+            description
+                "Common Language Location Identifier (CLLI) code.
+                 Standard identifier for the physical location/building.";
+        }
+
+        leaf service-rate {
+            type identityref {
+                base org-openroadm-common-types:service-rate-identity;
+            }
+            description
+                "Service rate for this endpoint.
+                 Examples: rate-100G, rate-200G, rate-400G.";
+        }
+
+        leaf service-format {
+            type enumeration {
+                enum Ethernet {
+                    description "Ethernet client service.";
+                }
+                enum OTU {
+                    description "OTU (Optical Transport Unit) service.";
+                }
+                enum ODU {
+                    description "ODU (Optical Data Unit) service.";
+                }
+                enum OC {
+                    description "Optical Channel service.";
+                }
+            }
+            description
+                "Signal format/encoding for the service.";
+        }
+
+        container port {
+            description
+                "Physical port details for the endpoint.";
+
+            leaf port-device-name {
+                type string;
+                description
+                    "Device name hosting the port.";
+            }
+
+            leaf port-type {
+                type string;
+                description
+                    "Port type (e.g., client, network, line).";
+            }
+
+            leaf port-name {
+                type string;
+                description
+                    "Physical port name.";
+            }
+
+            leaf port-rack {
+                type string;
+                description
+                    "Rack location of the port.";
+            }
+
+            leaf port-shelf {
+                type string;
+                description
+                    "Shelf location of the port.";
+            }
+
+            leaf port-slot {
+                type string;
+                description
+                    "Slot location of the port.";
+            }
+
+            leaf port-sub-slot {
+                type string;
+                description
+                    "Sub-slot location of the port.";
+            }
+        }
+
+        container lgx {
+            description
+                "Light Guide Cross-connect (LGX) information.
+                 Used for fiber patching and physical layer management.";
+
+            leaf lgx-device-name {
+                type string;
+                description "LGX device name.";
+            }
+            leaf lgx-port-name {
+                type string;
+                description "LGX port name.";
+            }
+            leaf lgx-port-rack {
+                type string;
+                description "LGX port rack location.";
+            }
+            leaf lgx-port-shelf {
+                type string;
+                description "LGX port shelf location.";
+            }
+        }
+    }
+
+    grouping service-path-constraints {
+        description
+            "Constraints for service path computation.";
+
+        leaf diversity {
+            type enumeration {
+                enum node-diverse {
+                    description "Path must be node-diverse from reference service.";
+                }
+                enum link-diverse {
+                    description "Path must be link-diverse from reference service.";
+                }
+                enum srlg-diverse {
+                    description "Path must avoid SRLGs of reference service.";
+                }
+                enum none {
+                    description "No diversity constraint.";
+                }
+            }
+            description
+                "Diversity constraint for path computation.
+                 Ensures service protection by using different resources.";
+        }
+
+        leaf diversity-service-id {
+            type string;
+            description
+                "Reference service for diversity computation.
+                 The new service path will be diverse from this service.";
+        }
+
+        leaf latency {
+            type uint32;
+            units "ms";
+            description
+                "Maximum acceptable end-to-end latency in milliseconds.";
+        }
+
+        leaf max-distance {
+            type uint32;
+            units "km";
+            description
+                "Maximum total fiber distance in kilometers.";
+        }
+
+        leaf cost {
+            type uint32;
+            description
+                "Maximum acceptable routing cost metric.";
+        }
+
+        list exclude-nodes {
+            key "node-id";
+            description
+                "Nodes to exclude from the path.";
+            leaf node-id {
+                type string;
+                description "Node to exclude.";
+            }
+        }
+
+        list include-nodes {
+            key "node-id";
+            description
+                "Nodes that must be included in the path.";
+            leaf node-id {
+                type string;
+                description "Node to include.";
+            }
+        }
+    }
+
+    container service-list {
+        description
+            "Container for all provisioned services.";
+
+        list services {
+            key "service-name";
+            description
+                "List of provisioned optical services.
+                 Each service represents an end-to-end optical path
+                 with allocated wavelength and configured devices.";
+
+            leaf service-name {
+                type string;
+                mandatory true;
+                description
+                    "Unique service identifier.";
+            }
+
+            leaf common-id {
+                type string;
+                description
+                    "Common identifier shared by related services
+                     (e.g., working and protection paths).";
+            }
+
+            leaf connection-type {
+                type enumeration {
+                    enum service {
+                        description "Standard optical service.";
+                    }
+                    enum infrastructure {
+                        description "Infrastructure/management connection.";
+                    }
+                    enum roadm-line {
+                        description "ROADM line-side connection.";
+                    }
+                }
+                description
+                    "Type of connection.";
+            }
+
+            leaf lifecycle-state {
+                type enumeration {
+                    enum planned {
+                        description "Service is planned but not yet provisioned.";
+                    }
+                    enum deployed {
+                        description "Service is deployed and configured.";
+                    }
+                    enum in-service {
+                        description "Service is active and carrying traffic.";
+                    }
+                    enum maintenance {
+                        description "Service is under maintenance.";
+                    }
+                    enum reconfigure {
+                        description "Service is being reconfigured.";
+                    }
+                    enum retiring {
+                        description "Service is being decommissioned.";
+                    }
+                }
+                description
+                    "Current lifecycle state of the service.";
+            }
+
+            leaf administrative-state {
+                type enumeration {
+                    enum in-service;
+                    enum out-of-service;
+                    enum maintenance;
+                }
+                description
+                    "Administrative state of the service.";
+            }
+
+            leaf operational-state {
+                type enumeration {
+                    enum in-service;
+                    enum out-of-service;
+                    enum degraded;
+                }
+                config false;
+                description
+                    "Operational state of the service.";
+            }
+
+            container service-a-end {
+                description
+                    "A-end (source) of the service.";
+                uses service-endpoint;
+            }
+
+            container service-z-end {
+                description
+                    "Z-end (destination) of the service.";
+                uses service-endpoint;
+            }
+
+            container service-path {
+                description
+                    "Computed path for the service through the network.";
+
+                leaf wavelength-number {
+                    type org-openroadm-common-types:wavelength-num;
+                    description
+                        "Assigned wavelength channel number.
+                         Range: 1-96 for C-band 50 GHz grid.";
+                }
+
+                leaf frequency {
+                    type org-openroadm-common-types:frequency-THz;
+                    description
+                        "Center frequency of the assigned channel.";
+                }
+
+                leaf modulation-format {
+                    type identityref {
+                        base org-openroadm-common-types:modulation-format-identity;
+                    }
+                    description
+                        "Modulation format used for the optical channel.
+                         Examples: dp-qpsk (100G), dp-16qam (200G).";
+                }
+
+                list hop {
+                    key "hop-number";
+                    description
+                        "Ordered list of hops in the service path.
+                         Each hop represents a node traversed by the service.";
+
+                    leaf hop-number {
+                        type uint16;
+                        description "Sequential hop number starting from 1.";
+                    }
+
+                    leaf node-id {
+                        type string;
+                        description "Node traversed at this hop.";
+                    }
+
+                    leaf ingress-tp {
+                        type string;
+                        description "Ingress termination point at this hop.";
+                    }
+
+                    leaf egress-tp {
+                        type string;
+                        description "Egress termination point at this hop.";
+                    }
+                }
+            }
+
+            uses service-path-constraints;
+        }
+    }
+
+    rpc service-create {
+        description
+            "Create a new optical service.
+             This RPC initiates service provisioning including:
+             1. Path computation through the network
+             2. Wavelength assignment
+             3. Device configuration along the path
+             4. Service activation
+
+             The service will traverse ROADM nodes and transponders
+             to establish an end-to-end optical connection.";
+
+        input {
+            leaf service-name {
+                type string;
+                mandatory true;
+                description "Unique name for the new service.";
+            }
+
+            leaf connection-type {
+                type enumeration {
+                    enum service;
+                    enum infrastructure;
+                    enum roadm-line;
+                }
+                description "Type of connection to create.";
+            }
+
+            container service-a-end {
+                description "Source endpoint specification.";
+                uses service-endpoint;
+            }
+
+            container service-z-end {
+                description "Destination endpoint specification.";
+                uses service-endpoint;
+            }
+
+            uses service-path-constraints;
+        }
+
+        output {
+            leaf status {
+                type enumeration {
+                    enum success {
+                        description "Service created successfully.";
+                    }
+                    enum failed {
+                        description "Service creation failed.";
+                    }
+                    enum in-progress {
+                        description "Service creation in progress.";
+                    }
+                }
+                description "Result of the service creation.";
+            }
+
+            leaf status-message {
+                type string;
+                description "Detailed status message.";
+            }
+
+            leaf service-name {
+                type string;
+                description "Name of the created service.";
+            }
+        }
+    }
+
+    rpc service-delete {
+        description
+            "Delete an existing optical service.
+             This RPC tears down the service including:
+             1. Service deactivation
+             2. Device de-configuration
+             3. Wavelength release
+             4. Resource cleanup";
+
+        input {
+            leaf service-name {
+                type string;
+                mandatory true;
+                description "Name of the service to delete.";
+            }
+        }
+
+        output {
+            leaf status {
+                type enumeration {
+                    enum success;
+                    enum failed;
+                }
+                description "Result of the service deletion.";
+            }
+            leaf status-message {
+                type string;
+                description "Detailed status message.";
+            }
+        }
+    }
+
+    rpc service-reconfigure {
+        description
+            "Reconfigure an existing optical service.
+             Allows modification of service parameters without
+             full teardown and re-creation.
+
+             Supported modifications:
+             - Change service rate
+             - Modify path constraints
+             - Update endpoint parameters";
+
+        input {
+            leaf service-name {
+                type string;
+                mandatory true;
+                description "Name of the service to reconfigure.";
+            }
+
+            leaf new-service-rate {
+                type identityref {
+                    base org-openroadm-common-types:service-rate-identity;
+                }
+                description
+                    "New service rate if rate change is requested.";
+            }
+
+            uses service-path-constraints;
+        }
+
+        output {
+            leaf status {
+                type enumeration {
+                    enum success;
+                    enum failed;
+                    enum in-progress;
+                }
+                description "Result of reconfiguration.";
+            }
+            leaf status-message {
+                type string;
+                description "Detailed status message.";
+            }
+        }
+    }
+
+    notification service-state-change {
+        description
+            "Notification when a service state changes.";
+        leaf service-name {
+            type string;
+            description "Service that changed state.";
+        }
+        leaf old-state {
+            type string;
+            description "Previous state.";
+        }
+        leaf new-state {
+            type string;
+            description "New state.";
+        }
+    }
+
+    notification service-path-change {
+        description
+            "Notification when a service path is rerouted.";
+        leaf service-name {
+            type string;
+            description "Service that was rerouted.";
+        }
+        leaf reason {
+            type string;
+            description "Reason for reroute.";
+        }
+    }
+}

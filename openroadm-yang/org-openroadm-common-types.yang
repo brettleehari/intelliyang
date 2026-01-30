@@ -1,0 +1,287 @@
+module org-openroadm-common-types {
+    namespace "http://org/openroadm/common-types";
+    prefix org-openroadm-common-types;
+
+    organization
+        "Open ROADM MSA";
+    contact
+        "OpenROADM.org";
+    description
+        "YANG definitions of common types used across OpenROADM models.
+         This module provides shared type definitions, identities, and
+         groupings that are imported by device, network, and service models.
+
+         Copyright of the Members of the Open ROADM Multi-Source Agreement 2024.
+         All rights reserved.";
+
+    revision 2024-01-01 {
+        description
+            "Version 18.1.0";
+    }
+
+    typedef node-types {
+        type enumeration {
+            enum rdm {
+                value 1;
+                description
+                    "Reconfigurable Optical Add-Drop Multiplexer (ROADM) node.
+                     Supports wavelength routing and switching at optical layer.";
+            }
+            enum xpdr {
+                value 2;
+                description
+                    "Transponder/Muxponder node. Performs optical-electrical-optical
+                     conversion for client signal adaptation.";
+            }
+            enum ila {
+                value 3;
+                description
+                    "In-Line Amplifier node. Amplifies optical signals along
+                     a fiber span without wavelength add/drop capability.";
+            }
+            enum extplug {
+                value 4;
+                description
+                    "External pluggable optics node. Provides pluggable
+                     optical interface capabilities.";
+            }
+        }
+        description
+            "Type of optical network element in the OpenROADM network.";
+    }
+
+    typedef openroadm-node-status {
+        type enumeration {
+            enum in-service {
+                value 1;
+                description
+                    "Node is fully operational and carrying traffic.";
+            }
+            enum out-of-service {
+                value 2;
+                description
+                    "Node is administratively removed from service.";
+            }
+            enum maintenance {
+                value 3;
+                description
+                    "Node is under maintenance operations.";
+            }
+            enum degraded {
+                value 4;
+                description
+                    "Node is operational but with degraded performance.";
+            }
+        }
+        description
+            "Operational status of an OpenROADM network element.";
+    }
+
+    typedef fiber-type {
+        type enumeration {
+            enum smf {
+                description
+                    "Single-Mode Fiber (ITU-T G.652). Standard single-mode
+                     fiber used in long-haul and metro networks.";
+            }
+            enum eleaf {
+                description
+                    "Enhanced Large Effective Area Fiber (ITU-T G.655).
+                     Optimized for DWDM transmission with reduced
+                     nonlinear effects.";
+            }
+            enum truewave {
+                description
+                    "TrueWave fiber. Non-zero dispersion-shifted fiber
+                     designed for WDM applications.";
+            }
+            enum truewavec {
+                description
+                    "TrueWave Classic fiber. Earlier generation non-zero
+                     dispersion-shifted fiber.";
+            }
+            enum nz-dsf {
+                description
+                    "Non-Zero Dispersion Shifted Fiber. Generic NZDSF
+                     fiber type per ITU-T G.655.";
+            }
+        }
+        description
+            "Fiber types used in OpenROADM optical networks.";
+    }
+
+    typedef port-direction {
+        type enumeration {
+            enum tx {
+                description
+                    "Transmit-only port direction.";
+            }
+            enum rx {
+                description
+                    "Receive-only port direction.";
+            }
+            enum bidirectional {
+                description
+                    "Port supports both transmit and receive.";
+            }
+        }
+        description
+            "Direction of an optical port.";
+    }
+
+    typedef wavelength-num {
+        type uint32 {
+            range "1..96";
+        }
+        description
+            "Wavelength channel number in the C-band grid.
+             Supports up to 96 channels on a 50 GHz grid.";
+    }
+
+    typedef power-dBm {
+        type decimal64 {
+            fraction-digits 2;
+            range "-60.00..30.00";
+        }
+        description
+            "Optical power in dBm. Valid range from -60 dBm to +30 dBm.";
+    }
+
+    typedef gain-dB {
+        type decimal64 {
+            fraction-digits 2;
+            range "0.00..40.00";
+        }
+        description
+            "Optical gain in dB. Used for amplifier gain settings.";
+    }
+
+    typedef span-loss-dB {
+        type decimal64 {
+            fraction-digits 2;
+            range "0.00..50.00";
+        }
+        description
+            "Fiber span loss in dB. Typical values for metro spans
+             are 0-28 dB for standard reach applications.";
+    }
+
+    typedef frequency-THz {
+        type decimal64 {
+            fraction-digits 6;
+            range "186.000000..196.150000";
+        }
+        description
+            "Center frequency in THz for C-band DWDM channels.";
+    }
+
+    identity service-rate-identity {
+        description
+            "Base identity for all service rate types.";
+    }
+
+    identity rate-100G {
+        base service-rate-identity;
+        description
+            "100 Gigabit Ethernet service rate.";
+    }
+
+    identity rate-200G {
+        base service-rate-identity;
+        description
+            "200 Gigabit Ethernet service rate.";
+    }
+
+    identity rate-400G {
+        base service-rate-identity;
+        description
+            "400 Gigabit Ethernet service rate. Highest currently
+             supported line-side rate in OpenROADM.";
+    }
+
+    identity modulation-format-identity {
+        description
+            "Base identity for optical modulation formats.";
+    }
+
+    identity dp-qpsk {
+        base modulation-format-identity;
+        description
+            "Dual-Polarization Quadrature Phase-Shift Keying.
+             Used for 100G line-side transmission. Provides good
+             tolerance to fiber impairments.";
+    }
+
+    identity dp-16qam {
+        base modulation-format-identity;
+        description
+            "Dual-Polarization 16-Quadrature Amplitude Modulation.
+             Used for 200G line-side transmission. Higher spectral
+             efficiency but requires better OSNR.";
+    }
+
+    identity dp-64qam {
+        base modulation-format-identity;
+        description
+            "Dual-Polarization 64-QAM. Used for 400G short-reach.
+             Highest spectral efficiency but most sensitive to noise.";
+    }
+
+    grouping physical-location {
+        description
+            "Common grouping for physical location attributes
+             used across device components.";
+        leaf shelf-name {
+            type string;
+            description
+                "Name of the shelf housing this component.";
+        }
+        leaf slot-name {
+            type string;
+            description
+                "Name of the slot within the shelf.";
+        }
+        leaf rack {
+            type string;
+            description
+                "Rack identifier where the shelf is installed.";
+        }
+    }
+
+    grouping equipment-state {
+        description
+            "Common operational state for equipment.";
+        leaf operational-state {
+            type enumeration {
+                enum in-service {
+                    description "Equipment is operational.";
+                }
+                enum out-of-service {
+                    description "Equipment is not operational.";
+                }
+                enum under-test {
+                    description "Equipment is being tested.";
+                }
+            }
+            config false;
+            description
+                "Current operational state of the equipment.
+                 This is a read-only operational state leaf.";
+        }
+        leaf admin-state {
+            type enumeration {
+                enum in-service {
+                    description "Administratively in service.";
+                }
+                enum out-of-service {
+                    description "Administratively out of service.";
+                }
+                enum maintenance {
+                    description "Under maintenance.";
+                }
+            }
+            description
+                "Administrative state configured by the operator.";
+        }
+    }
+}

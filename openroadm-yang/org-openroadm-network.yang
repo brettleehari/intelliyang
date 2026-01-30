@@ -1,0 +1,543 @@
+module org-openroadm-network {
+    namespace "http://org/openroadm/network";
+    prefix org-openroadm-network;
+
+    import org-openroadm-common-types {
+        prefix org-openroadm-common-types;
+    }
+
+    organization
+        "Open ROADM MSA";
+    contact
+        "OpenROADM.org";
+    description
+        "YANG definitions for OpenROADM network topology model.
+         This module defines the optical network topology including
+         nodes, links, and their interconnections.
+
+         The network model represents the physical and logical
+         topology of the optical transport network.
+
+         Key concepts:
+         - Network Node: An optical network element (ROADM, transponder, amplifier)
+         - Termination Point: A connection endpoint on a node (degree, SRG, or XPDR port)
+         - Link: A physical or logical connection between termination points
+         - Span: A fiber segment between two nodes, including amplifier sites
+
+         Topology relationships:
+         - ROADM-to-ROADM links connect degrees across nodes
+         - XPDR-to-ROADM links connect transponders to SRG add/drop ports
+         - Each link has associated fiber span parameters (loss, distance, fiber type)
+
+         Copyright of the Members of the Open ROADM Multi-Source Agreement 2024.";
+
+    revision 2024-01-01 {
+        description
+            "Version 18.1.0";
+    }
+
+    container network {
+        description
+            "Top-level container for the OpenROADM network topology.";
+
+        leaf network-id {
+            type string;
+            mandatory true;
+            description
+                "Unique identifier for this network topology instance.";
+        }
+
+        list node {
+            key "node-id";
+            description
+                "List of nodes in the optical network topology.
+                 Each node represents a physical network element.
+
+                 Node types and their roles:
+                 - rdm: ROADM node with degrees and SRGs
+                 - xpdr: Transponder/muxponder for client access
+                 - ila: In-line amplifier on a fiber span
+                 - extplug: External pluggable optics
+
+                 A ROADM node provides:
+                 - Wavelength routing between degrees (express)
+                 - Add/drop via SRGs to local transponders
+                 - Optical amplification and equalization
+
+                 A Transponder node provides:
+                 - Client signal adaptation (Ethernet to optical)
+                 - Optical channel (wavelength) generation
+                 - Signal regeneration capability";
+
+            leaf node-id {
+                type string;
+                mandatory true;
+                description
+                    "Unique identifier for the network node.
+                     Should match the device info node-id.";
+            }
+
+            leaf node-type {
+                type org-openroadm-common-types:node-types;
+                description
+                    "Type of the network node.";
+            }
+
+            leaf administrative-state {
+                type enumeration {
+                    enum in-service;
+                    enum out-of-service;
+                    enum maintenance;
+                }
+                description
+                    "Administrative state of the node.";
+            }
+
+            leaf operational-state {
+                type enumeration {
+                    enum in-service;
+                    enum out-of-service;
+                    enum degraded;
+                }
+                config false;
+                description
+                    "Operational state of the node. Read-only.";
+            }
+
+            leaf software-version {
+                type string;
+                config false;
+                description
+                    "Software version running on the node.";
+            }
+
+            leaf openroadm-version {
+                type string;
+                config false;
+                description
+                    "OpenROADM MSA version supported by the node.";
+            }
+
+            leaf vendor {
+                type string;
+                config false;
+                description
+                    "Equipment vendor.";
+            }
+
+            leaf model {
+                type string;
+                config false;
+                description
+                    "Equipment model.";
+            }
+
+            leaf ip-address {
+                type string;
+                description
+                    "Management IP address of the node.";
+            }
+
+            container degree-attributes {
+                when "../node-type = 'rdm'";
+                description
+                    "Degree-related attributes for ROADM nodes.
+                     Only applicable when node-type is rdm.";
+
+                leaf max-degrees {
+                    type uint16;
+                    description
+                        "Maximum number of degrees supported.";
+                }
+
+                leaf available-wavelengths {
+                    type uint16;
+                    description
+                        "Number of wavelengths available per degree.";
+                }
+            }
+
+            container srg-attributes {
+                when "../node-type = 'rdm'";
+                description
+                    "SRG-related attributes for ROADM nodes.
+                     Only applicable when node-type is rdm.";
+
+                leaf max-srgs {
+                    type uint16;
+                    description
+                        "Maximum number of SRGs supported.";
+                }
+
+                leaf max-pp-per-srg {
+                    type uint16;
+                    description
+                        "Maximum port pairs per SRG.
+                         Determines add/drop capacity per SRG.";
+                }
+            }
+
+            container xpdr-attributes {
+                when "../node-type = 'xpdr'";
+                description
+                    "Transponder-specific attributes.
+                     Only applicable when node-type is xpdr.";
+
+                leaf xpdr-type {
+                    type enumeration {
+                        enum tpdr {
+                            description
+                                "Transponder. 1:1 mapping of client to line.";
+                        }
+                        enum mpdr {
+                            description
+                                "Muxponder. Multiple clients to one line.";
+                        }
+                        enum switch {
+                            description
+                                "Switch-type transponder with flexible mapping.";
+                        }
+                        enum regen {
+                            description
+                                "Regenerator. Signal regeneration without
+                                 client access.";
+                        }
+                    }
+                    description
+                        "Type of transponder functionality.";
+                }
+
+                leaf supported-client-rates {
+                    type string;
+                    description
+                        "Comma-separated list of supported client rates.
+                         Example: '10G,100G,400G'.";
+                }
+            }
+
+            list termination-point {
+                key "tp-id";
+                description
+                    "List of termination points on this node.
+                     A termination point is an endpoint for a network link.
+
+                     For ROADM nodes:
+                     - DEG-TTP: Degree Trail Termination Point (fiber side)
+                     - SRG-PP: SRG Port Pair (add/drop side)
+                     - SRG-CP: SRG Connection Port (internal)
+
+                     For Transponder nodes:
+                     - XPDR-NW: Network (line) side port
+                     - XPDR-CLIENT: Client side port";
+
+                leaf tp-id {
+                    type string;
+                    mandatory true;
+                    description
+                        "Unique termination point identifier.
+                         Naming convention:
+                         DEG<n>-TTP-TXRX, SRG<n>-PP<m>-TXRX, XPDR<n>-NW<m>.";
+                }
+
+                leaf tp-type {
+                    type enumeration {
+                        enum degree-txrx-ttp {
+                            description
+                                "Degree Trail Termination Point for bidirectional traffic.";
+                        }
+                        enum degree-tx-ttp {
+                            description
+                                "Degree transmit Trail Termination Point.";
+                        }
+                        enum degree-rx-ttp {
+                            description
+                                "Degree receive Trail Termination Point.";
+                        }
+                        enum srg-txrx-pp {
+                            description
+                                "SRG bidirectional Port Pair for add/drop.";
+                        }
+                        enum srg-tx-pp {
+                            description
+                                "SRG transmit Port Pair.";
+                        }
+                        enum srg-rx-pp {
+                            description
+                                "SRG receive Port Pair.";
+                        }
+                        enum srg-txrx-cp {
+                            description
+                                "SRG bidirectional Connection Port.";
+                        }
+                        enum xpdr-network {
+                            description
+                                "Transponder network (line) side port.";
+                        }
+                        enum xpdr-client {
+                            description
+                                "Transponder client side port.";
+                        }
+                    }
+                    description
+                        "Type of the termination point.
+                         Determines the role and connectivity rules.";
+                }
+
+                leaf associated-degree {
+                    type uint16;
+                    description
+                        "Degree number associated with this termination point.
+                         Applicable for degree-type TPs.";
+                }
+
+                leaf associated-srg {
+                    type uint16;
+                    description
+                        "SRG number associated with this termination point.
+                         Applicable for SRG-type TPs.";
+                }
+
+                leaf operational-state {
+                    type enumeration {
+                        enum in-service;
+                        enum out-of-service;
+                    }
+                    config false;
+                    description
+                        "Operational state of the termination point.";
+                }
+            }
+        }
+
+        list link {
+            key "link-id";
+            description
+                "List of links in the network topology.
+                 Links represent physical or logical connections
+                 between termination points on different nodes.
+
+                 Link types:
+                 - ROADM-to-ROADM: Express fiber connection between degrees
+                 - XPDR-to-ROADM: Local connection from transponder to SRG
+                 - ADD-LINK: Internal ROADM link from SRG to degree
+                 - DROP-LINK: Internal ROADM link from degree to SRG
+                 - EXPRESS-LINK: Internal ROADM link between degrees";
+
+            leaf link-id {
+                type string;
+                mandatory true;
+                description
+                    "Unique link identifier.";
+            }
+
+            leaf link-type {
+                type enumeration {
+                    enum roadm-to-roadm {
+                        description
+                            "Inter-node fiber link between ROADM degrees.
+                             Includes fiber span with amplification.";
+                    }
+                    enum xpdr-to-roadm {
+                        description
+                            "Local link from transponder to ROADM SRG.
+                             Short-reach connection within a site.";
+                    }
+                    enum express-link {
+                        description
+                            "Internal ROADM link between degrees.
+                             Wavelength pass-through path.";
+                    }
+                    enum add-link {
+                        description
+                            "Internal ROADM link from SRG to degree.
+                             Path for adding wavelengths.";
+                    }
+                    enum drop-link {
+                        description
+                            "Internal ROADM link from degree to SRG.
+                             Path for dropping wavelengths.";
+                    }
+                }
+                description
+                    "Type of the network link.";
+            }
+
+            container source {
+                description
+                    "Source endpoint of the link.";
+                leaf source-node {
+                    type leafref {
+                        path "/network/node/node-id";
+                    }
+                    description "Source node identifier.";
+                }
+                leaf source-tp {
+                    type string;
+                    description "Source termination point.";
+                }
+            }
+
+            container destination {
+                description
+                    "Destination endpoint of the link.";
+                leaf dest-node {
+                    type leafref {
+                        path "/network/node/node-id";
+                    }
+                    description "Destination node identifier.";
+                }
+                leaf dest-tp {
+                    type string;
+                    description "Destination termination point.";
+                }
+            }
+
+            container span {
+                when "../link-type = 'roadm-to-roadm'";
+                description
+                    "Fiber span attributes for ROADM-to-ROADM links.
+                     Contains physical fiber characteristics used for
+                     optical power budget calculations.";
+
+                leaf span-loss {
+                    type org-openroadm-common-types:span-loss-dB;
+                    description
+                        "Total span loss in dB including fiber attenuation
+                         and connector losses. Typical values:
+                         - Short span: 0-10 dB
+                         - Metro span: 10-20 dB
+                         - Long span: 20-28 dB (standard reach limit)";
+                }
+
+                leaf distance {
+                    type decimal64 {
+                        fraction-digits 2;
+                    }
+                    units "km";
+                    description
+                        "Physical fiber distance in kilometers.";
+                }
+
+                leaf fiber-type {
+                    type org-openroadm-common-types:fiber-type;
+                    description
+                        "Type of optical fiber used in the span.
+                         Affects dispersion and nonlinear characteristics.";
+                }
+
+                leaf pmd {
+                    type decimal64 {
+                        fraction-digits 2;
+                    }
+                    units "ps";
+                    description
+                        "Polarization Mode Dispersion in picoseconds.
+                         Higher PMD values degrade signal quality,
+                         particularly for high-rate signals.";
+                }
+
+                leaf auto-spanloss {
+                    type boolean;
+                    default true;
+                    description
+                        "Enable automatic span loss measurement.
+                         When true, the system periodically measures
+                         and updates the span loss value.";
+                }
+
+                list amplified-link {
+                    key "section-elt-number";
+                    description
+                        "List of amplified sections within the span.
+                         A span may include one or more inline amplifiers.";
+
+                    leaf section-elt-number {
+                        type uint16;
+                        description "Section element index.";
+                    }
+
+                    leaf section-element {
+                        type enumeration {
+                            enum ila {
+                                description "In-line amplifier section.";
+                            }
+                            enum fiber {
+                                description "Fiber section.";
+                            }
+                        }
+                        description "Type of section element.";
+                    }
+
+                    container ila-attributes {
+                        when "../section-element = 'ila'";
+                        description
+                            "Attributes for an in-line amplifier section.";
+
+                        leaf node-id {
+                            type string;
+                            description "ILA node identifier.";
+                        }
+
+                        leaf gain {
+                            type org-openroadm-common-types:gain-dB;
+                            description
+                                "Amplifier gain in dB.
+                                 Valid range: 0-40 dB.
+                                 Typical operating range: 10-25 dB.";
+                        }
+
+                        leaf tilt {
+                            type decimal64 {
+                                fraction-digits 2;
+                            }
+                            description
+                                "Amplifier gain tilt in dB.
+                                 Compensates for fiber tilt effects.";
+                        }
+
+                        leaf noise-figure {
+                            type decimal64 {
+                                fraction-digits 2;
+                            }
+                            units "dB";
+                            description
+                                "Amplifier noise figure in dB.
+                                 Typical value: 5-7 dB for EDFA.";
+                        }
+
+                        leaf out-voa-att {
+                            type decimal64 {
+                                fraction-digits 2;
+                            }
+                            units "dB";
+                            description
+                                "Variable Optical Attenuator setting at
+                                 the output of the amplifier.";
+                        }
+                    }
+                }
+            }
+
+            leaf administrative-state {
+                type enumeration {
+                    enum in-service;
+                    enum out-of-service;
+                    enum maintenance;
+                }
+                description
+                    "Administrative state of the link.";
+            }
+
+            leaf operational-state {
+                type enumeration {
+                    enum in-service;
+                    enum out-of-service;
+                    enum degraded;
+                }
+                config false;
+                description
+                    "Operational state of the link. Read-only.";
+            }
+        }
+    }
+}

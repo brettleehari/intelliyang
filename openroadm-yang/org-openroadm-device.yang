@@ -1,0 +1,872 @@
+module org-openroadm-device {
+    namespace "http://org/openroadm/device";
+    prefix org-openroadm-device;
+
+    import org-openroadm-common-types {
+        prefix org-openroadm-common-types;
+    }
+
+    organization
+        "Open ROADM MSA";
+    contact
+        "OpenROADM.org";
+    description
+        "YANG definitions for OpenROADM device model.
+         This module defines the physical and logical device hierarchy:
+         device → shelves → slots → circuit-packs → ports → interfaces.
+
+         The device model represents a single optical network element
+         including ROADM nodes, transponders, amplifiers, and other
+         optical equipment.
+
+         Key concepts:
+         - Shelf: Physical chassis containing slots for circuit packs
+         - Slot: Position within a shelf for a circuit pack
+         - Circuit Pack: A pluggable or fixed optical card
+         - Port: Physical optical or electrical port on a circuit pack
+         - Interface: Logical interface configured on a port
+         - Degree: A ROADM direction (fiber pair) for express traffic
+         - SRG: Shared Risk Group for add/drop wavelength ports
+
+         Copyright of the Members of the Open ROADM Multi-Source Agreement 2024.";
+
+    revision 2024-01-01 {
+        description
+            "Version 18.1.0";
+    }
+
+    container org-openroadm-device {
+        description
+            "Top-level container for the OpenROADM device model.
+             Contains all device configuration and operational state.";
+
+        container info {
+            description
+                "Device identification and general information.
+                 Contains mandatory fields required for device registration
+                 and management.";
+
+            leaf node-id {
+                type string {
+                    length "1..255";
+                }
+                mandatory true;
+                description
+                    "Unique identifier for the network element.
+                     Used for NETCONF session identification and
+                     network topology correlation.";
+            }
+
+            leaf node-type {
+                type org-openroadm-common-types:node-types;
+                mandatory true;
+                description
+                    "Type of the optical network element.
+                     Determines the capabilities and configuration
+                     model applicable to this device.
+                     Values: rdm (ROADM), xpdr (Transponder),
+                     ila (In-Line Amplifier), extplug (External Pluggable).";
+            }
+
+            leaf node-status {
+                type org-openroadm-common-types:openroadm-node-status;
+                description
+                    "Current operational status of the node.";
+            }
+
+            leaf vendor {
+                type string;
+                config false;
+                description
+                    "Equipment vendor name. Read-only field populated
+                     by the device.";
+            }
+
+            leaf model {
+                type string;
+                config false;
+                description
+                    "Equipment model identifier. Read-only field.";
+            }
+
+            leaf serial-id {
+                type string;
+                config false;
+                description
+                    "Equipment serial number. Read-only field.";
+            }
+
+            leaf software-version {
+                type string;
+                config false;
+                description
+                    "Currently running software version.";
+            }
+
+            leaf ipAddress {
+                type string;
+                description
+                    "Management IP address of the network element.";
+            }
+
+            leaf prefix-length {
+                type uint8 {
+                    range "0..128";
+                }
+                description
+                    "IP prefix length for the management interface.";
+            }
+
+            leaf default-gateway {
+                type string;
+                description
+                    "Default gateway IP address for management traffic.";
+            }
+
+            leaf max-degrees {
+                type uint16;
+                config false;
+                description
+                    "Maximum number of degrees supported by this ROADM.
+                     Determines the maximum node connectivity.
+                     Read-only value defined by hardware.";
+            }
+
+            leaf max-srgs {
+                type uint16;
+                config false;
+                description
+                    "Maximum number of Shared Risk Groups (SRGs) supported.
+                     Determines the maximum add/drop capacity.
+                     Read-only value defined by hardware.";
+            }
+
+            leaf max-num-bin-15min-historical-pm {
+                type uint16;
+                config false;
+                description
+                    "Maximum number of 15-minute PM bins stored.";
+            }
+
+            leaf max-num-bin-24hour-historical-pm {
+                type uint16;
+                config false;
+                description
+                    "Maximum number of 24-hour PM bins stored.";
+            }
+        }
+
+        list shelves {
+            key "shelf-name";
+            description
+                "List of physical shelves (chassis) in the device.
+                 Each shelf contains slots for installing circuit packs.
+                 A device may have multiple shelves for scalability.
+
+                 The shelf hierarchy is:
+                 shelf → slot → circuit-pack → port";
+
+            leaf shelf-name {
+                type string;
+                description
+                    "Unique name identifying the shelf within the device.
+                     Example: 'shelf-1', 'shelf-2'.";
+            }
+
+            leaf shelf-type {
+                type string;
+                description
+                    "Type/model of the shelf chassis.
+                     Determines slot count and supported card types.";
+            }
+
+            leaf shelf-position {
+                type string;
+                description
+                    "Physical position of the shelf in the rack.";
+            }
+
+            leaf administrative-state {
+                type enumeration {
+                    enum in-service;
+                    enum out-of-service;
+                    enum maintenance;
+                }
+                description
+                    "Administrative state of the shelf.";
+            }
+
+            leaf operational-state {
+                type enumeration {
+                    enum enabled;
+                    enum disabled;
+                }
+                config false;
+                description
+                    "Operational state of the shelf. Read-only.";
+            }
+
+            leaf equipment-state {
+                type enumeration {
+                    enum reserved-for-facility-available {
+                        description
+                            "Shelf slot is reserved and equipment is present.";
+                    }
+                    enum not-reserved-available {
+                        description
+                            "Shelf slot is not reserved, equipment available.";
+                    }
+                    enum not-reserved-inuse {
+                        description
+                            "Shelf slot is not reserved but in use.";
+                    }
+                }
+                description
+                    "Equipment provisioning state.";
+            }
+
+            list slots {
+                key "slot-name";
+                description
+                    "List of slots within the shelf.
+                     Each slot can hold one circuit pack.";
+
+                leaf slot-name {
+                    type string;
+                    description
+                        "Unique slot identifier within the shelf.
+                         Example: 'slot-1', 'slot-A'.";
+                }
+
+                leaf slot-status {
+                    type enumeration {
+                        enum empty {
+                            description "No circuit pack installed.";
+                        }
+                        enum occupied {
+                            description "Circuit pack is installed.";
+                        }
+                        enum reserved {
+                            description "Slot is reserved for a specific card type.";
+                        }
+                    }
+                    config false;
+                    description
+                        "Current status of the slot. Read-only.";
+                }
+
+                leaf provisioned-circuit-pack {
+                    type leafref {
+                        path "/org-openroadm-device/circuit-packs/circuit-pack-name";
+                    }
+                    description
+                        "Reference to the circuit pack installed in this slot.";
+                }
+            }
+        }
+
+        list circuit-packs {
+            key "circuit-pack-name";
+            description
+                "List of circuit packs (cards) installed in the device.
+                 A circuit pack is a pluggable or fixed optical/electrical
+                 card that provides specific functionality.
+
+                 Common circuit pack types include:
+                 - Transponder (TPDR): Optical-electrical-optical conversion
+                 - Muxponder (MPDR): Multiplexing multiple client signals
+                 - Amplifier (AMP): Optical signal amplification
+                 - WSS/OAM: Wavelength Selective Switch / Optical Add-drop Module
+                 - Pluggable: SFP/QSFP pluggable optics
+
+                 Each circuit pack has one or more ports for connectivity.";
+
+            leaf circuit-pack-name {
+                type string;
+                mandatory true;
+                description
+                    "Unique name identifying the circuit pack.";
+            }
+
+            leaf circuit-pack-type {
+                type string;
+                description
+                    "Type of the circuit pack. Determines the card's
+                     functionality and supported port types.
+                     Examples: transponder, muxponder, amplifier, wssoam.";
+            }
+
+            leaf circuit-pack-mode {
+                type string;
+                description
+                    "Operating mode of the circuit pack.
+                     Some cards support multiple modes of operation.";
+            }
+
+            uses org-openroadm-common-types:physical-location;
+            uses org-openroadm-common-types:equipment-state;
+
+            leaf vendor {
+                type string;
+                config false;
+                description
+                    "Circuit pack vendor. Read-only.";
+            }
+
+            leaf model {
+                type string;
+                config false;
+                description
+                    "Circuit pack model number. Read-only.";
+            }
+
+            leaf serial-id {
+                type string;
+                config false;
+                description
+                    "Circuit pack serial number. Read-only.";
+            }
+
+            leaf hardware-version {
+                type string;
+                config false;
+                description
+                    "Hardware version of the circuit pack.";
+            }
+
+            leaf firmware-version {
+                type string;
+                config false;
+                description
+                    "Firmware version running on the circuit pack.";
+            }
+
+            list ports {
+                key "port-name";
+                description
+                    "List of ports on the circuit pack.
+                     Ports provide physical connectivity for optical
+                     and electrical signals.";
+
+                leaf port-name {
+                    type string;
+                    mandatory true;
+                    description
+                        "Unique port identifier within the circuit pack.";
+                }
+
+                leaf port-type {
+                    type string;
+                    description
+                        "Type of the port. Examples: line, client, network, add, drop.";
+                }
+
+                leaf port-direction {
+                    type org-openroadm-common-types:port-direction;
+                    description
+                        "Signal direction of the port: tx, rx, or bidirectional.";
+                }
+
+                leaf port-qual {
+                    type enumeration {
+                        enum roadm-internal {
+                            description "Internal ROADM port (not externally accessible).";
+                        }
+                        enum roadm-external {
+                            description "External ROADM port connected to fiber.";
+                        }
+                        enum xpdr-network {
+                            description "Transponder network-side (line) port.";
+                        }
+                        enum xpdr-client {
+                            description "Transponder client-side port.";
+                        }
+                    }
+                    description
+                        "Port qualification indicating the port's role
+                         in the optical network.";
+                }
+
+                leaf port-wavelength-type {
+                    type enumeration {
+                        enum wavelength {
+                            description "Port handles single wavelength.";
+                        }
+                        enum multi-wavelength {
+                            description "Port handles multiple wavelengths (e.g., express).";
+                        }
+                    }
+                    description
+                        "Whether the port handles single or multiple wavelengths.";
+                }
+
+                leaf administrative-state {
+                    type enumeration {
+                        enum in-service;
+                        enum out-of-service;
+                        enum maintenance;
+                    }
+                    description
+                        "Administrative state of the port.";
+                }
+
+                leaf operational-state {
+                    type enumeration {
+                        enum in-service;
+                        enum out-of-service;
+                        enum degraded;
+                    }
+                    config false;
+                    description
+                        "Operational state of the port. Read-only.";
+                }
+            }
+        }
+
+        list degree {
+            key "degree-number";
+            description
+                "List of ROADM degrees. A degree represents a direction
+                 or fiber pair connected to the ROADM node.
+
+                 Each degree typically has:
+                 - A pair of fibers (DEG-TX and DEG-RX) connecting to
+                   adjacent nodes
+                 - A Wavelength Selective Switch (WSS) for express traffic
+                 - Amplifiers for signal conditioning
+
+                 Degrees enable express (pass-through) wavelength routing
+                 between different directions of the ROADM.
+
+                 The relationship between degrees and SRGs:
+                 - Degrees handle express traffic between directions
+                 - SRGs handle add/drop traffic to/from local clients
+                 - Wavelengths can be routed from any degree to any other
+                   degree or to/from any SRG";
+
+            leaf degree-number {
+                type uint16 {
+                    range "1..20";
+                }
+                description
+                    "Unique degree number. Valid range is 1-20.
+                     Each degree number corresponds to a physical
+                     fiber direction.";
+            }
+
+            leaf max-wavelengths {
+                type org-openroadm-common-types:wavelength-num;
+                description
+                    "Maximum number of wavelengths supported on this degree.
+                     Typically 96 for C-band 50 GHz grid.";
+            }
+
+            leaf deg-tx-port {
+                type leafref {
+                    path "/org-openroadm-device/circuit-packs/ports/port-name";
+                }
+                description
+                    "Reference to the transmit port for this degree.";
+            }
+
+            leaf deg-rx-port {
+                type leafref {
+                    path "/org-openroadm-device/circuit-packs/ports/port-name";
+                }
+                description
+                    "Reference to the receive port for this degree.";
+            }
+
+            list connection-ports {
+                key "index";
+                description
+                    "List of connection ports associated with this degree.";
+
+                leaf index {
+                    type uint32;
+                    description "Index of the connection port.";
+                }
+
+                leaf circuit-pack-name {
+                    type leafref {
+                        path "/org-openroadm-device/circuit-packs/circuit-pack-name";
+                    }
+                    description
+                        "Circuit pack providing this connection port.";
+                }
+
+                leaf port-name {
+                    type string;
+                    description
+                        "Port name on the circuit pack.";
+                }
+            }
+        }
+
+        list shared-risk-group {
+            key "srg-number";
+            description
+                "List of Shared Risk Groups (SRGs).
+
+                 An SRG represents a set of add/drop ports that share
+                 a common optical risk (e.g., connected to the same
+                 amplifier or WSS module).
+
+                 SRGs provide local add/drop capability:
+                 - Add ports: inject client wavelengths into the ROADM
+                 - Drop ports: extract wavelengths from the ROADM to clients
+
+                 Key relationships:
+                 - SRGs connect to transponders/muxponders for client access
+                 - Wavelengths added via an SRG can be routed to any degree
+                 - Wavelengths from any degree can be dropped to any SRG
+                 - Multiple SRGs increase the add/drop capacity of a node
+
+                 SRG capacity determines how many wavelengths can be
+                 locally added/dropped at a ROADM node.";
+
+            leaf srg-number {
+                type uint16 {
+                    range "1..20";
+                }
+                description
+                    "Unique SRG number. Valid range is 1-20.";
+            }
+
+            leaf max-add-drop-ports {
+                type uint16;
+                description
+                    "Maximum number of add/drop ports in this SRG.
+                     Determines the local client connectivity capacity.";
+            }
+
+            leaf wavelength-duplication {
+                type enumeration {
+                    enum one-per-srg {
+                        description
+                            "Each wavelength can only be used once per SRG.";
+                    }
+                    enum one-per-degree {
+                        description
+                            "Each wavelength can be used once per degree
+                             direction within the SRG.";
+                    }
+                }
+                description
+                    "Wavelength duplication policy for the SRG.
+                     Determines wavelength reuse rules.";
+            }
+
+            list circuit-packs {
+                key "index";
+                description
+                    "Circuit packs associated with this SRG.";
+
+                leaf index {
+                    type uint32;
+                    description "Index.";
+                }
+                leaf circuit-pack-name {
+                    type leafref {
+                        path "/org-openroadm-device/circuit-packs/circuit-pack-name";
+                    }
+                    description
+                        "Reference to the circuit pack in this SRG.";
+                }
+            }
+        }
+
+        container interfaces {
+            description
+                "Container for all logical interfaces on the device.
+                 Interfaces are configured on top of physical ports
+                 and define the logical connectivity.";
+
+            list interface {
+                key "name";
+                description
+                    "List of logical interfaces.
+
+                     Interface types include:
+                     - Optical Channel (OCH): Wavelength-level interface
+                     - Optical Transport Unit (OTU): OTN framing interface
+                     - Optical Data Unit (ODU): OTN payload interface
+                     - Ethernet: Client-side Ethernet interface
+                     - Optical Transport Section (OTS): Fiber-level interface
+                     - Optical Multiplex Section (OMS): Multi-wavelength section
+
+                     Interface hierarchy for a typical 100G connection:
+                     Ethernet → ODU → OTU → OCH (at line side)";
+
+                leaf name {
+                    type string;
+                    mandatory true;
+                    description
+                        "Unique interface name.";
+                }
+
+                leaf description {
+                    type string;
+                    description
+                        "Human-readable description of the interface.";
+                }
+
+                leaf type {
+                    type enumeration {
+                        enum optical-channel {
+                            description "Optical Channel interface for a wavelength.";
+                        }
+                        enum otu {
+                            description "Optical Transport Unit interface.";
+                        }
+                        enum odu {
+                            description "Optical Data Unit interface.";
+                        }
+                        enum ethernet {
+                            description "Ethernet client interface.";
+                        }
+                        enum ots {
+                            description "Optical Transport Section (fiber-level).";
+                        }
+                        enum oms {
+                            description "Optical Multiplex Section.";
+                        }
+                    }
+                    description
+                        "Interface type determining the protocol layer.";
+                }
+
+                leaf administrative-state {
+                    type enumeration {
+                        enum in-service;
+                        enum out-of-service;
+                        enum maintenance;
+                    }
+                    description
+                        "Administrative state of the interface.";
+                }
+
+                leaf supporting-circuit-pack-name {
+                    type leafref {
+                        path "/org-openroadm-device/circuit-packs/circuit-pack-name";
+                    }
+                    description
+                        "Circuit pack providing this interface.";
+                }
+
+                leaf supporting-port {
+                    type string;
+                    description
+                        "Physical port supporting this interface.";
+                }
+
+                leaf supporting-interface {
+                    type leafref {
+                        path "/org-openroadm-device/interfaces/interface/name";
+                    }
+                    description
+                        "Lower-layer interface supporting this interface.
+                         Used for interface stacking (e.g., ODU over OTU).";
+                }
+            }
+        }
+
+        container protocols {
+            description
+                "Protocol configurations on the device.";
+
+            container lldp {
+                description
+                    "Link Layer Discovery Protocol configuration.
+                     Used for automatic neighbor discovery between
+                     OpenROADM nodes.";
+
+                leaf admin-status {
+                    type enumeration {
+                        enum enabled;
+                        enum disabled;
+                    }
+                    description
+                        "Enable or disable LLDP on the device.";
+                }
+
+                list port-config {
+                    key "if-name";
+                    description
+                        "Per-port LLDP configuration.";
+
+                    leaf if-name {
+                        type string;
+                        description "Interface name.";
+                    }
+                    leaf admin-status {
+                        type enumeration {
+                            enum tx-only;
+                            enum rx-only;
+                            enum tx-and-rx;
+                            enum disabled;
+                        }
+                        description "Per-port LLDP mode.";
+                    }
+                }
+            }
+
+            container rstp {
+                description
+                    "Rapid Spanning Tree Protocol configuration
+                     for Ethernet management network protection.";
+
+                leaf bridge-priority {
+                    type uint32;
+                    description "STP bridge priority.";
+                }
+            }
+        }
+
+        container olm {
+            description
+                "Optical Line Management (OLM) configuration and state.
+
+                 OLM manages optical power levels and performs automated
+                 optical link verification and setup procedures.
+
+                 Key OLM timers:
+                 - OLM_TIMER1 (120 seconds): Stabilization timer.
+                   Time allowed for optical power levels to stabilize
+                   after an amplifier gain change or link activation.
+                   The system waits this duration before taking power
+                   measurements to ensure accuracy.
+
+                 - OLM_TIMER2 (20 seconds): Measurement timer.
+                   Time window for taking optical power measurements.
+                   Multiple samples are collected during this period
+                   and averaged for reliable power readings.
+
+                 OLM procedures:
+                 1. Link activation: Power up amplifiers, wait TIMER1
+                 2. Power measurement: Read power levels over TIMER2
+                 3. Gain adjustment: Set amplifier gains based on measurements
+                 4. Verification: Confirm power levels within target range
+
+                 These timers are critical for optical network stability.
+                 Setting them too low can lead to inaccurate measurements
+                 and oscillating power levels.";
+
+            leaf olm-timer1 {
+                type uint32 {
+                    range "60..300";
+                }
+                default 120;
+                description
+                    "OLM stabilization timer in seconds.
+                     Default: 120 seconds.
+                     Valid range: 60-300 seconds.
+                     This timer determines how long the system waits
+                     for optical power levels to stabilize after
+                     changes. Critical for accurate power management.";
+            }
+
+            leaf olm-timer2 {
+                type uint32 {
+                    range "10..60";
+                }
+                default 20;
+                description
+                    "OLM measurement timer in seconds.
+                     Default: 20 seconds.
+                     Valid range: 10-60 seconds.
+                     Duration of optical power measurement window.
+                     Samples taken during this period are averaged.";
+            }
+
+            leaf target-output-power {
+                type org-openroadm-common-types:power-dBm;
+                description
+                    "Target per-channel output power in dBm.
+                     The OLM system adjusts amplifier gains to
+                     achieve this target at the output of each
+                     degree or amplifier.";
+            }
+        }
+    }
+
+    rpc get-device-info {
+        description
+            "Retrieve device identification and status information.
+             Returns the current device info including node-id,
+             node-type, vendor, model, and operational state.";
+        output {
+            leaf node-id {
+                type string;
+                description "Device node identifier.";
+            }
+            leaf node-type {
+                type org-openroadm-common-types:node-types;
+                description "Device type.";
+            }
+            leaf status {
+                type org-openroadm-common-types:openroadm-node-status;
+                description "Current device status.";
+            }
+        }
+    }
+
+    rpc set-olm-timers {
+        description
+            "Configure OLM timer values.
+             Allows setting stabilization (TIMER1) and measurement
+             (TIMER2) timer values for optical line management.";
+        input {
+            leaf timer1 {
+                type uint32 {
+                    range "60..300";
+                }
+                description
+                    "OLM stabilization timer in seconds.";
+            }
+            leaf timer2 {
+                type uint32 {
+                    range "10..60";
+                }
+                description
+                    "OLM measurement timer in seconds.";
+            }
+        }
+        output {
+            leaf status {
+                type enumeration {
+                    enum success;
+                    enum failure;
+                }
+                description "Result of the operation.";
+            }
+        }
+    }
+
+    notification alarm-notification {
+        description
+            "Notification sent when an alarm condition changes.";
+        leaf alarm-id {
+            type string;
+            description "Unique alarm identifier.";
+        }
+        leaf resource {
+            type string;
+            description "Resource affected by the alarm.";
+        }
+        leaf severity {
+            type enumeration {
+                enum critical;
+                enum major;
+                enum minor;
+                enum warning;
+                enum clear;
+            }
+            description "Alarm severity level.";
+        }
+        leaf alarm-type {
+            type string;
+            description "Type/category of the alarm.";
+        }
+    }
+}
