@@ -37,3 +37,9 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Escalation logs
+escalation_logs/
+
+# Pytest cache
+.pytest_cache/
