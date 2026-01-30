@@ -40,7 +40,10 @@ class YANGChatbot:
         self.graph_builder = YANGGraphBuilder()
         self.vector_store = VectorStore()
         self.keyword_search = KeywordSearch()
-        self.validator = YANGValidator(config=self.config.validation)
+        self.validator = YANGValidator(
+            config=self.config.validation,
+            ast_parser=self.processor.ast_parser,
+        )
         self.escalation_manager = EscalationManager()
 
         # RAG system (initialized after loading models)
@@ -79,19 +82,23 @@ class YANGChatbot:
         # Extract semantic chunks
         chunks = self.processor.extract_semantic_chunks()
 
-        # Build graph
+        # Build graphs (module dependency + Code Property Graph)
         self.graph_builder.build_from_modules(modules)
 
-        # Index chunks for search
+        # Index chunks for search and build CPG
         if chunks:
             self.vector_store.add_chunks(chunks)
             self.keyword_search.index_chunks(chunks)
+            # Build Code Property Graph with leafref/constraint edges
+            cpg_graph = YANGGraphBuilder()
+            cpg_graph.build_cpg_from_chunks(chunks)
+            self.cpg_builder = cpg_graph
             self.display.print_info(f"Indexed {len(chunks)} semantic chunks from {len(modules)} modules")
 
         # Initialize LLM client
         self._init_llm_client()
 
-        # Initialize RAG system
+        # Initialize RAG system with graph for AST-aware reranking
         self.rag_system = YANGRagSystem(
             vector_store=self.vector_store,
             keyword_search=self.keyword_search,
@@ -101,6 +108,7 @@ class YANGChatbot:
                 **self.config.llm,
                 "confidence_threshold": self.config.validation.get("confidence_threshold", 0.90),
             },
+            graph_builder=getattr(self, 'cpg_builder', None),
         )
 
         self.session.loaded_modules = list(modules.keys())

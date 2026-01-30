@@ -17,8 +17,9 @@ logger = logging.getLogger(__name__)
 class YANGRagSystem:
     """RAG system combining vector and keyword search for YANG model queries.
 
-    Implements hybrid retrieval (vector + BM25) following IETF framework patterns
-    and NetLLMBench best practices.
+    Implements hybrid retrieval (vector + BM25) with AST-aware reranking
+    following IETF framework patterns and NetLLMBench best practices.
+    Graph context from the CPG is used to boost related nodes.
     """
 
     def __init__(
@@ -27,11 +28,13 @@ class YANGRagSystem:
         keyword_search: KeywordSearch,
         llm_client: Optional[Any] = None,
         config: Optional[Dict[str, Any]] = None,
+        graph_builder: Optional[Any] = None,
     ):
         self.vector_store = vector_store
         self.keyword_search = keyword_search
         self.llm_client = llm_client
         self.config = config or {}
+        self.graph_builder = graph_builder
         self.confidence_scorer = ConfidenceScorer(
             confidence_threshold=self.config.get("confidence_threshold", 0.90)
         )
@@ -100,6 +103,31 @@ class YANGRagSystem:
                 scored_chunks[cid] = (existing_chunk, existing_score + (1 - alpha) * keyword_score)
             else:
                 scored_chunks[cid] = (chunk, (1 - alpha) * keyword_score)
+
+        # AST-aware reranking: boost chunks that are graph-connected
+        # to other high-scoring chunks (following Aider's PageRank pattern)
+        if self.graph_builder and hasattr(self.graph_builder, 'graph'):
+            graph = self.graph_builder.graph
+            boost_factor = 0.1  # 10% boost for graph-connected nodes
+            chunk_ids = list(scored_chunks.keys())
+            for cid in chunk_ids:
+                if cid not in graph:
+                    continue
+                # Check if this node connects to other retrieved chunks
+                neighbors = set()
+                for _, target, _ in graph.out_edges(cid, data=True):
+                    neighbors.add(target)
+                for source, _, _ in graph.in_edges(cid, data=True):
+                    neighbors.add(source)
+
+                connected_count = sum(
+                    1 for n in neighbors if n in scored_chunks
+                )
+                if connected_count > 0:
+                    chunk, score = scored_chunks[cid]
+                    scored_chunks[cid] = (
+                        chunk, score + boost_factor * connected_count
+                    )
 
         # Sort by combined score
         ranked = sorted(scored_chunks.values(), key=lambda x: x[1], reverse=True)[:top_k]

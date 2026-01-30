@@ -153,8 +153,19 @@ class VectorStore:
         ]
 
     def _chunk_to_text(self, chunk: YANGChunk) -> str:
-        """Convert a YANG chunk to searchable text."""
+        """Convert a YANG chunk to searchable text with path-based embedding.
+
+        Follows Code2Vec-style path encoding: include the XPath hierarchy
+        as a structured prefix so that path relationships are captured
+        in the embedding space. This helps the vector search understand
+        containment and hierarchy without explicit graph traversal.
+        """
+        # Path-based prefix: encode hierarchy for embedding
+        path_parts = chunk.xpath.strip("/").split("/")
+        path_context = " > ".join(path_parts)
+
         parts = [
+            f"Path: {path_context}",
             f"Module: {chunk.module}",
             f"Type: {chunk.chunk_type.value}",
             f"XPath: {chunk.xpath}",
@@ -163,6 +174,22 @@ class VectorStore:
             parts.append(f"Description: {chunk.description}")
         if chunk.constraints:
             parts.append(f"Constraints: {'; '.join(chunk.constraints)}")
+
+        # Include relationship context for richer embeddings
+        relationships = chunk.relationships
+        if relationships.get("imports"):
+            parts.append(f"Imports: {', '.join(relationships['imports'][:5])}")
+        if relationships.get("uses"):
+            parts.append(f"Uses groupings: {', '.join(relationships['uses'][:5])}")
+        if relationships.get("leafrefs"):
+            parts.append(f"Leafref paths: {', '.join(relationships['leafrefs'][:3])}")
+
+        # Include parent context for nested elements
+        parent_kw = chunk.metadata.get("parent_keyword", "")
+        parent_name = chunk.metadata.get("parent_name", "")
+        if parent_kw and parent_name:
+            parts.append(f"Parent: {parent_kw} {parent_name}")
+
         parts.append(f"Definition:\n{chunk.content}")
         return "\n".join(parts)
 

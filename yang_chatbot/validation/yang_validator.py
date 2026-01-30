@@ -23,11 +23,12 @@ class YANGValidator:
     4. Confidence threshold check
     """
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None, ast_parser: Optional[Any] = None):
         self.config = config or {}
         self.confidence_threshold = self.config.get("confidence_threshold", 0.90)
         self.escalation_enabled = self.config.get("escalation_enabled", True)
         self.optical_validator = OpticalConstraintValidator()
+        self._ast_parser = ast_parser  # tree-sitter parser for AST error detection
 
     def validate(self, content: str, confidence: float = 1.0) -> ValidationResult:
         """Run the full validation pipeline."""
@@ -92,7 +93,15 @@ class YANGValidator:
         """
         issues = []
 
-        # Try pyang if available
+        # Stage A: AST error detection via tree-sitter (fast, no external deps)
+        if self._ast_parser and hasattr(self._ast_parser, 'get_errors'):
+            errors = self._ast_parser.get_errors(content)
+            if errors:
+                for line, col, ctx in errors:
+                    issues.append(f"AST parse error at line {line}:{col}: {ctx[:60]}")
+                return False, issues
+
+        # Stage B: pyang validation if available
         try:
             result = subprocess.run(
                 ["pyang", "--lint", "-"],
@@ -108,7 +117,7 @@ class YANGValidator:
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pass
 
-        # Fallback: basic structural checks
+        # Stage C: basic structural checks
         return self._basic_syntax_check(content)
 
     def _basic_syntax_check(self, content: str) -> Tuple[bool, List[str]]:
