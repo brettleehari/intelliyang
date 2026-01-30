@@ -1,0 +1,29 @@
+yang_models:
+  directory: "./openroadm-yang"
+  versions: ["18.1.0"]
+  modules: ["device", "network", "service", "common"]
+
+llm:
+  provider: "openai"
+  model: "gpt-4-turbo"
+  max_tokens: 2000
+  temperature: 0.1
+
+rag:
+  chunk_size: 1000
+  overlap: 200
+  top_k: 5
+  hybrid_alpha: 0.7
+
+validation:
+  confidence_threshold: 0.90
+  escalation_enabled: true
+  syntax_validation: true
+  semantic_validation: true
+  optical_constraints: true
+
+cli:
+  prompt: "OpenROADM> "
+  max_history: 100
+  auto_save_session: true
+  rich_formatting: true
